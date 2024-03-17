@@ -1,6 +1,8 @@
-use std::process;
+use std::{env::current_dir, process};
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
+
+use kvs::Commands;
 
 #[derive(Parser)]
 #[command(name = env!("CARGO_PKG_NAME"))]
@@ -10,28 +12,32 @@ struct Cli {
     command: Commands,
 }
 
-#[derive(Debug, Subcommand)]
-enum Commands {
-    Set { key: String, value: String },
-    Get { key: String },
-    Rm { key: String },
-}
-
-fn main() {
+fn main() -> kvs::Result<()> {
     let cli = Cli::parse();
 
+    let mut kvs = kvs::KvStore::open(current_dir()?).unwrap();
+
     match cli.command {
-        Commands::Set { key: _, value: _ } => {
-            eprintln!("unimplemented");
-            process::exit(1);
+        Commands::Set { key, value } => {
+            kvs.set(key, value)?;
+            Ok(())
         }
-        Commands::Get { key: _ } => {
-            eprintln!("unimplemented");
-            process::exit(1);
+        Commands::Get { key } => {
+            let value = kvs.get(key)?;
+            let value = value.unwrap_or_else(|| {
+                println!("Key not found");
+                process::exit(0);
+            });
+            println!("{}", value);
+            Ok(())
         }
-        Commands::Rm { key: _ } => {
-            eprintln!("unimplemented");
-            process::exit(1);
+        Commands::Rm { key } => {
+            let result = kvs.remove(key);
+            if result.is_err() {
+                println!("Key not found");
+                process::exit(1);
+            }
+            Ok(())
         }
     }
 }
